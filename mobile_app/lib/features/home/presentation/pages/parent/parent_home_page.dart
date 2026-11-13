@@ -221,6 +221,7 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ------------------------------------------------------------ banner
+        // Chỉ bao quanh lời chào, tên phụ huynh, chọn con và chọn chuyến
         Container(
           width: double.infinity,
           clipBehavior: Clip.antiAlias,
@@ -231,16 +232,16 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
               colors: [HomeColors.primary, HomeColors.primaryMid, HomeColors.primaryLight],
             ),
             borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(32),
-              bottomRight: Radius.circular(32),
+              bottomLeft: Radius.circular(28),
+              bottomRight: Radius.circular(28),
             ),
           ),
           child: Stack(
             children: [
               const Positioned(right: -50, top: -50, child: HomeCircle(size: 190, alpha: 0x14)),
-              const Positioned(left: -40, bottom: 90, child: HomeCircle(size: 110, alpha: 0x10)),
+              const Positioned(left: -40, bottom: -20, child: HomeCircle(size: 110, alpha: 0x10)),
               Padding(
-                padding: EdgeInsets.fromLTRB(20, top + 16, 20, 24),
+                padding: EdgeInsets.fromLTRB(20, top + 16, 20, 22),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -313,8 +314,6 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
                         ],
                       ),
                     ],
-                    const SizedBox(height: 16),
-                    hero,
                   ],
                 ),
               ),
@@ -322,13 +321,17 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
           ),
         ),
 
-        // ------------------------------------------------------ các mục dưới
-        if (trip != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        // ------------------------------------------------------ các mục dưới (nền sáng)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Đưa thẻ thông tin chính (HomeHeroCard) ra nền sáng bên dưới banner
+              hero,
+              const SizedBox(height: 16),
+
+              if (trip != null) ...[
                 if (trip.attendanceStatus == 'BOARDED' && trip.tripStatus == 'COMPLETED') ...[
                   HomeBanner(
                     icon: Icons.warning_amber_rounded,
@@ -387,10 +390,9 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
                 const HomeSectionTitle('Chi tiết chuyến'),
                 HomeCard(child: TripDetailsCard(trip: trip)),
               ],
-            ),
-          )
-        else
-          const SizedBox(height: 28),
+            ],
+          ),
+        ),
       ],
     );
   }

@@ -7,8 +7,8 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'face_embedding_helper.dart';
-import 'mobile_facenet_service.dart'; // 🟢 Import Service AI MobileFaceNet
+import '../../../../students/data/services/face_embedding_helper.dart';
+import '../../../../students/data/services/mobile_facenet_service.dart'; // 🟢 Import Service AI MobileFaceNet
 
 enum _NoticeType { success, warning, error, info }
 
@@ -244,7 +244,8 @@ class _FaceScanPageState extends State<FaceScanPage>
               avatar_url,
               face_embeddings (
                 embedding_data,
-                is_active
+                is_active,
+                model_name
               )
             )
           ''')
@@ -272,32 +273,40 @@ class _FaceScanPageState extends State<FaceScanPage>
       for (var record in listData) {
         final studentData = record['students'] as Map<String, dynamic>;
         final String studentName = studentData['full_name'] ?? 'Học sinh';
-        final embeddingsList = studentData['face_embeddings'] as List<dynamic>?;
+        // Chỉ lấy vector đang hoạt động VÀ cùng mô hình (loại vector giả DEV-FAKE)
+        final embeddingsList = (studentData['face_embeddings'] as List<dynamic>?)
+            ?.where((e) =>
+                e['is_active'] != false &&
+                e['model_name'] == MobileFaceNetService.modelName)
+            .toList();
 
         if (embeddingsList != null && embeddingsList.isNotEmpty) {
-          final dbEmbeddingRaw = embeddingsList.first['embedding_data'];
-
-          if (dbEmbeddingRaw != null) {
+          // Phụ huynh đăng ký 3 góc mặt: so với cả 3, lấy điểm cao nhất
+          double similarity = -1.0;
+          for (final emb in embeddingsList) {
+            final raw = emb['embedding_data'];
+            if (raw == null) continue;
             try {
-              final List<double> dbEmbedding = FaceEmbeddingHelper.bytesToFloat32List(dbEmbeddingRaw);
-              
-              // Tính độ tương đồng Cosine
-              double similarity = FaceEmbeddingHelper.calculateCosineSimilarity(liveEmbedding, dbEmbedding);
-
-              final double percentScore = (similarity * 100).clamp(0.0, 100.0);
-              debugPrint('👤 Học sinh: $studentName | AI Similarity: ${similarity.toStringAsFixed(4)} (${percentScore.toStringAsFixed(1)}%)');
-
-              if (similarity > highestSimilarity) {
-                highestSimilarity = similarity;
-                bestMatch = {
-                  'attendance_id': record['attendance_id'],
-                  'status': record['status'],
-                  'student_data': studentData,
-                  'similarity': similarity,
-                };
-              }
+              final dbEmbedding = FaceEmbeddingHelper.bytesToFloat32List(raw);
+              final s = FaceEmbeddingHelper.calculateCosineSimilarity(liveEmbedding, dbEmbedding);
+              if (s > similarity) similarity = s;
             } catch (e) {
               debugPrint('❌ Lỗi giải mã vector của $studentName: $e');
+            }
+          }
+
+          if (similarity >= 0) {
+            final double percentScore = (similarity * 100).clamp(0.0, 100.0);
+            debugPrint('👤 Học sinh: $studentName | AI Similarity: ${similarity.toStringAsFixed(4)} (${percentScore.toStringAsFixed(1)}%)');
+
+            if (similarity > highestSimilarity) {
+              highestSimilarity = similarity;
+              bestMatch = {
+                'attendance_id': record['attendance_id'],
+                'status': record['status'],
+                'student_data': studentData,
+                'similarity': similarity,
+              };
             }
           }
         } else {
@@ -343,7 +352,7 @@ class _FaceScanPageState extends State<FaceScanPage>
             subtitle: blockMsg,
             percent: matchPercent,
           ));
-          await Future.delayed(const Duration(seconds: 3));
+          await Future.delayed(const Duration(seconds: 2));
           if (mounted) {
             setState(() => _isProcessingAI = false);
             _startLiveFaceDetection();
@@ -369,7 +378,7 @@ class _FaceScanPageState extends State<FaceScanPage>
               'similarity_score': highestSimilarity,
               'stop': widget.stopName,
               'mode': mode,
-              'check_in_time_raw': checkInTime.toIso8601String(),
+              'check_in_time': DateTime.now().toUtc().toIso8601String(),
             };
           });
           _showSuccessBottomSheet();
@@ -400,7 +409,7 @@ class _FaceScanPageState extends State<FaceScanPage>
   }
   void _showNotice(
     _ScanNotice n, {
-    Duration duration = const Duration(seconds: 3),
+    Duration duration = const Duration(seconds: 2),
   }) {
     if (!mounted) return;
     _noticeTimer?.cancel();

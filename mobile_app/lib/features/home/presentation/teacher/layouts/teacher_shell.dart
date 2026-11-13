@@ -145,7 +145,7 @@ class _TeacherShellState extends State<TeacherShell> {
       ),
 
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 10.0, right: 2.0),
+        padding: const EdgeInsets.only(bottom: 45.0, right: 2.5),
         child: Container(
           width: 56,
           height: 56,
@@ -153,26 +153,26 @@ class _TeacherShellState extends State<TeacherShell> {
             borderRadius: BorderRadius.circular(18),
             gradient: const LinearGradient(
               colors: [
-                Color(0xFF60A5FA),
-                Color(0xFF2563EB),
-                Color(0xFF1D4ED8),
+                Color(0xFFFDE047), // Vàng sáng phần trên
+                Color(0xFFFACC15), // Vàng thân xe buýt chủ đạo
+                Color(0xFFEAB308), // Vàng đậm tạo khối
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             border: Border.all(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withOpacity(0.9),
               width: 2.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF2563EB).withOpacity(0.38),
+                color: const Color(0xFFEAB308).withOpacity(0.42),
                 blurRadius: 14,
                 spreadRadius: 1,
                 offset: const Offset(0, 5),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withOpacity(0.1),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -184,12 +184,12 @@ class _TeacherShellState extends State<TeacherShell> {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: _openCameraScan,
-              splashColor: Colors.white.withOpacity(0.3),
-              highlightColor: Colors.white.withOpacity(0.1),
+              splashColor: Colors.white.withOpacity(0.4),
+              highlightColor: Colors.white.withOpacity(0.15),
               child: const Center(
                 child: Icon(
                   Icons.camera_alt_rounded,
-                  color: Colors.white,
+                  color: Color(0xFF0F172A), // Xanh đen đậm (giống sọc & bánh xe) giúp icon rõ nét
                   size: 26,
                 ),
               ),

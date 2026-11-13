@@ -8,10 +8,13 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 class MobileFaceNetService {
   static const String modelAsset = 'assets/mobilefacenet.tflite';
   static const int inputSize = 112;
+  static const String modelName = 'MobileFaceNet_TFLite';
 
   Interpreter? _interpreter;
   Future<void>? _loading;
   int _outputDim = 192;
+  bool _closed = false;
+
 
   final FaceDetector _detector = FaceDetector(
     options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate),
@@ -41,8 +44,9 @@ class MobileFaceNetService {
   /// Trả về [] nếu không thấy mặt. Ném exception nếu model lỗi.
   Future<List<double>> extractEmbedding(String imagePath, [Face? face]) async {
     await loadModel();
-    final interpreter = _interpreter!;
-
+    
+    await loadModel();
+    if (_closed) return [];
     // 1. Đọc ảnh và xoay đúng hướng (EXIF), lưu file tạm đã "nướng" hướng xoay
     final bytes = await File(imagePath).readAsBytes();
     final decoded = img.decodeImage(bytes);
@@ -54,9 +58,10 @@ class MobileFaceNetService {
 
     try {
       // 2. Phát hiện mặt trên đúng ảnh đã xoay -> tọa độ chắc chắn khớp
-      final faces =
-          await _detector.processImage(InputImage.fromFilePath(tmpPath));
+     final faces = await _detector.processImage(InputImage.fromFilePath(tmpPath));
+      if (_closed) return [];
       if (faces.isEmpty) return [];
+
 
       // chọn khuôn mặt lớn nhất
       faces.sort((a, b) => (b.boundingBox.width * b.boundingBox.height)
@@ -91,6 +96,8 @@ class MobileFaceNetService {
       ];
 
       // 5. Chạy model, đầu ra lấy theo shape thật của model
+      final interpreter = _interpreter;
+      if (interpreter == null || _closed) return [];
       final output = List.filled(_outputDim, 0.0).reshape([1, _outputDim]);
       interpreter.run(input, output);
 
@@ -117,5 +124,6 @@ class MobileFaceNetService {
     _interpreter = null;
     _loading = null;
     _detector.close();
+    _closed = true;
   }
 }

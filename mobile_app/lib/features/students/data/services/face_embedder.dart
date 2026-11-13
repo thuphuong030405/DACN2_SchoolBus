@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'mobile_facenet_service.dart';
 
 /// Không tìm thấy đúng 1 khuôn mặt trong ảnh.
 class FaceNotDetectedException implements Exception {
@@ -64,9 +65,34 @@ class DevFakeFaceEmbedder implements FaceEmbedder {
   }
 }
 
-/// ===== NỐI MÔ HÌNH THẬT Ở ĐÂY =====
-/// Khi phần AI điểm danh đã có service tạo vector (MobileFaceNet/ArcFace TFLite...),
-/// tạo một class implements [FaceEmbedder] gọi vào service đó rồi đổi provider bên dưới, ví dụ:
-///   final faceEmbedderProvider = Provider<FaceEmbedder>((ref) => TfliteFaceEmbedder(...));
-final faceEmbedderProvider =
-    Provider<FaceEmbedder>((ref) => const DevFakeFaceEmbedder());
+/// Bộ tạo vector THẬT: dùng đúng MobileFaceNet + cách tiền xử lý với màn hình quét của giáo viên.
+class MobileFaceNetEmbedder implements FaceEmbedder {
+  MobileFaceNetEmbedder() : _service = MobileFaceNetService();
+  final MobileFaceNetService _service;
+
+  @override
+  String get modelName => MobileFaceNetService.modelName;
+
+  @override
+  bool get isFake => false;
+
+  @override
+  Future<Float32List> embed(File image) async {
+    final v = await _service.extractEmbedding(image.path);
+    if (v.isEmpty) {
+      throw FaceNotDetectedException(
+        'Không nhận diện được khuôn mặt. Hãy chụp lại, nhìn thẳng, '
+        'đủ sáng và chỉ có một khuôn mặt trong ảnh.',
+      );
+    }
+    return Float32List.fromList(v);
+  }
+
+  void dispose() => _service.close();
+}
+
+final faceEmbedderProvider = Provider<FaceEmbedder>((ref) {
+  final embedder = MobileFaceNetEmbedder();
+  ref.onDispose(embedder.dispose);
+  return embedder;
+});

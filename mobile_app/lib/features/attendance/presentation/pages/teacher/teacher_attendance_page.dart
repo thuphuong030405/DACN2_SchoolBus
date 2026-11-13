@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'register_face_page.dart';
 import 'emergency_alert_modal.dart';
 import 'trip_success_modal.dart';
 
@@ -313,7 +312,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     final attendanceId = item['attendance_id'];
     final bool pickup = _directionMode == 'PICKUP';
     final String name = '${item['name']}';
-    final String now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
 
     try {
       final updated = await _supabase
@@ -925,32 +924,6 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
                 ),
               ],
             ),
-          ),
-
-          // =========================================================
-          // NÚT ĐĂNG KÝ KHUÔN MẶT AI (THÊM VÀO ĐÂY)
-          // =========================================================
-          IconButton(
-            icon: const Icon(Icons.face_retouching_natural, color: Color(0xFF1E52E8), size: 22),
-            tooltip: 'Đăng ký khuôn mặt',
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            onPressed: () async {
-              final bool? isSuccess = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => RegisterFacePage(
-                    studentId: student['student_id'],
-                    studentName: student['name'],
-                  ),
-                ),
-              );
-
-              // Sau khi đăng ký xong -> Làm mới danh sách
-              if (isSuccess == true && mounted) {
-                _fetchAttendanceData();
-              }
-            },
           ),
 
           const SizedBox(width: 4),
