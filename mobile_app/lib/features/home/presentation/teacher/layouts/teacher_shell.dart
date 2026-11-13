@@ -145,7 +145,7 @@ class _TeacherShellState extends State<TeacherShell> {
       ),
 
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 6.0, right: 2.0),
+        padding: const EdgeInsets.only(bottom: 10.0, right: 2.0),
         child: Container(
           width: 56,
           height: 56,

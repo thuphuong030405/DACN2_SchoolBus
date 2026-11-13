@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile_app/features/home/presentation/pages/parent/parent_shell.dart';
 
 import '../providers/auth_providers.dart';
 import '../../domain/entities/app_user.dart';
@@ -110,7 +111,7 @@ class AuthGate extends ConsumerWidget {
     return _withChatbot(DriverHomePage(user: user), 'tài xế');
 
   case UserRole.parent:
-    return _withChatbot(ParentHomePage(user: user), 'phụ huynh');
+    return _withChatbot(ParentShell(), 'phụ huynh');
 }
       },
     );
