@@ -1,0 +1,197 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:mobile_app/features/authentication/domain/entities/app_user.dart';
+
+import '../pages/teacher_home_page.dart';
+import '../widgets/teacher_bottom_navigation.dart';
+
+import 'package:mobile_app/features/trips/presentation/pages/teacher/teacher_route_page.dart';
+import 'package:mobile_app/features/attendance/presentation/pages/teacher/teacher_attendance_page.dart';
+import 'package:mobile_app/features/alerts/presentation/pages/teacher/teacher_alerts_page.dart';
+import 'package:mobile_app/features/profile/presentation/pages/teacher/teacher_profile_page.dart';
+
+import 'package:mobile_app/features/attendance/presentation/pages/teacher/face_scan_page.dart';
+
+class TeacherShell extends StatefulWidget {
+  final AppUser user;
+
+  
+  const TeacherShell({
+    super.key,
+    required this.user,
+  });
+
+  @override
+  State<TeacherShell> createState() => _TeacherShellState();
+}
+
+class _TeacherShellState extends State<TeacherShell> {
+  final _supabase = Supabase.instance.client;
+  int _currentIndex = 0;
+
+  // Biến phát tín hiệu reload dữ liệu cho màn hình Điểm danh
+  final ValueNotifier<bool> _attendanceReloadNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<String> _directionNotifier = ValueNotifier<String>('PICKUP');
+  final ValueNotifier<int> _homeReloadNotifier = ValueNotifier<int>(0);
+
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pages = [
+      TeacherHomePage(user: widget.user, refreshNotifier: _homeReloadNotifier),
+      const TeacherRoutePage(),
+      TeacherAttendancePage(
+        reloadNotifier: _attendanceReloadNotifier,
+        directionNotifier: _directionNotifier,
+      ),
+      const TeacherAlertsPage(),
+      TeacherProfilePage(user: widget.user),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _attendanceReloadNotifier.dispose();
+    _directionNotifier.dispose();
+    _homeReloadNotifier.dispose();
+    super.dispose();
+  }
+
+  void _onTabSelected(int index) {
+    if (index < 0 || index >= _pages.length) return;
+
+    setState(() {
+      _currentIndex = index;
+    });
+    if (index == 0) _homeReloadNotifier.value++;
+  }
+
+  // 📷 TRUY VẤN TRIP_ID ĐANG CHẠY VÀ MỞ MÀN HÌNH QUÉT CAMERA
+  Future<void> _openCameraScan() async {
+    try {
+      final tripRes = await _supabase
+          .from('trips')
+          .select('trip_id, routes(route_name)')
+          .eq('status', 'IN_PROGRESS')
+          .maybeSingle();
+
+      if (tripRes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không tìm thấy chuyến xe nào đang hoạt động!'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final String activeTripId = tripRes['trip_id'];
+      final routeData = tripRes['routes'] as Map<String, dynamic>?;
+      final String routeName = routeData?['route_name'] ?? 'Tuyến 05';
+
+      if (!mounted) return;
+
+      // Mở màn hình quét mặt
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => FaceScanPage(
+            tripId: activeTripId,
+            routeName: routeName,
+            stopName: '12 Lê Duẩn',
+            directionNotifier: _directionNotifier,
+          ),
+        ),
+      );
+
+      // KHI TẮT MÀN HÌNH QUÉT QUAY VỀ:
+      if (mounted) {
+        // 1. Tự động chuyển view về Tab Điểm danh (index = 2)
+        setState(() {
+          _currentIndex = 2;
+        });
+
+        // 2. Bật tín hiệu yêu cầu TeacherAttendancePage làm mới dữ liệu lập tức!
+        _attendanceReloadNotifier.value = !_attendanceReloadNotifier.value;
+      }
+    } catch (e) {
+      debugPrint('Lỗi mở camera quét mặt: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
+      ),
+
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 6.0, right: 2.0),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF60A5FA),
+                Color(0xFF2563EB),
+                Color(0xFF1D4ED8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.85),
+              width: 2.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2563EB).withOpacity(0.38),
+                blurRadius: 14,
+                spreadRadius: 1,
+                offset: const Offset(0, 5),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: _openCameraScan,
+              splashColor: Colors.white.withOpacity(0.3),
+              highlightColor: Colors.white.withOpacity(0.1),
+              child: const Center(
+                child: Icon(
+                  Icons.camera_alt_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+
+      bottomNavigationBar: TeacherBottomNavigation(
+        currentIndex: _currentIndex,
+        onTap: _onTabSelected,
+      ),
+    );
+  }
+}
