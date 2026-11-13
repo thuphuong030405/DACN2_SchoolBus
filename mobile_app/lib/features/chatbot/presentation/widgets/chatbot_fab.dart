@@ -19,7 +19,7 @@ class ChatbotFab extends StatefulWidget {
   const ChatbotFab({
     super.key,
     this.userRole,
-    this.bottom = 110,
+    this.bottom = 190,
     this.right = 16,
   });
 

@@ -12,6 +12,10 @@ import 'package:mobile_app/features/alerts/presentation/pages/teacher/teacher_al
 import 'package:mobile_app/features/profile/presentation/pages/teacher/teacher_profile_page.dart';
 
 import 'package:mobile_app/features/attendance/presentation/pages/teacher/face_scan_page.dart';
+import 'package:mobile_app/features/trips/data/repositories/active_trip_query.dart';
+
+import 'package:mobile_app/features/trips/data/repositories/active_trip_query.dart';
+
 
 class TeacherShell extends StatefulWidget {
   final AppUser user;
@@ -42,7 +46,13 @@ class _TeacherShellState extends State<TeacherShell> {
     super.initState();
 
     _pages = [
-      TeacherHomePage(user: widget.user, refreshNotifier: _homeReloadNotifier),
+      TeacherHomePage(
+        user: widget.user,
+        refreshNotifier: _homeReloadNotifier,
+        // Bấm "Bắt đầu chuyến" xong thì báo tab Điểm danh nạp lại danh sách
+        onTripStarted: () =>
+            _attendanceReloadNotifier.value = !_attendanceReloadNotifier.value,
+      ),
       const TeacherRoutePage(),
       TeacherAttendancePage(
         reloadNotifier: _attendanceReloadNotifier,
@@ -67,23 +77,24 @@ class _TeacherShellState extends State<TeacherShell> {
     setState(() {
       _currentIndex = index;
     });
+
+    // Quay về tab Chuyến xe thì tải lại (vd: sau khi chốt chuyến)
     if (index == 0) _homeReloadNotifier.value++;
   }
 
   // 📷 TRUY VẤN TRIP_ID ĐANG CHẠY VÀ MỞ MÀN HÌNH QUÉT CAMERA
   Future<void> _openCameraScan() async {
     try {
-      final tripRes = await _supabase
-          .from('trips')
-          .select('trip_id, routes(route_name)')
-          .eq('status', 'IN_PROGRESS')
-          .maybeSingle();
+      final tripRes = await ActiveTripQuery.forCurrentTeacher(
+        _supabase,
+        columns: 'trip_id, routes(route_name)',
+      );
 
       if (tripRes == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Không tìm thấy chuyến xe nào đang hoạt động!'),
+              content: Text('Chưa có chuyến đang chạy. Hãy bấm "Bắt đầu chuyến" ở tab Chuyến xe.'),
               backgroundColor: Colors.orange,
             ),
           );

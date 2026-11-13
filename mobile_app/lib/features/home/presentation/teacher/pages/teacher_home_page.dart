@@ -11,11 +11,13 @@ import 'package:mobile_app/features/trips/presentation/providers/trip_provider.d
 class TeacherHomePage extends ConsumerStatefulWidget {
   final AppUser user;
   final ValueNotifier<int>? refreshNotifier;
+  final VoidCallback? onTripStarted;
 
   const TeacherHomePage({
     super.key,
     required this.user,
     this.refreshNotifier,
+    this.onTripStarted,
   });
 
   static const Color primaryColor = Color(0xFF2563EB);
@@ -26,7 +28,8 @@ class TeacherHomePage extends ConsumerStatefulWidget {
 
 class _TeacherHomePageState extends ConsumerState<TeacherHomePage> {
   bool isLoggingOut = false;
-  
+  String? _startingTripId; // chuyến đang được bấm "Bắt đầu"
+
   @override
   void initState() {
     super.initState();
@@ -40,7 +43,62 @@ class _TeacherHomePageState extends ConsumerState<TeacherHomePage> {
   }
 
   void _refresh() => ref.invalidate(teacherTodayTripsProvider);
+
+  // =========================================================
+  // BẮT ĐẦU CHUYẾN
+  // =========================================================
+
+  Future<void> _startTrip(TeacherTrip trip) async {
+    if (_startingTripId != null) return;
+    setState(() => _startingTripId = trip.tripId);
+
+    try {
+      final updated = await Supabase.instance.client
+          .from('trips')
+          .update({'status': 'IN_PROGRESS'})
+          .eq('trip_id', trip.tripId)
+          .eq('status', 'SCHEDULED') // chỉ bắt đầu được chuyến chưa chạy
+          .select('trip_id');
+
+      if (updated.isEmpty) {
+        throw Exception(
+          'Không bắt đầu được chuyến (không có quyền hoặc chuyến đã thay đổi).',
+        );
+      }
+
+      ref.invalidate(teacherTodayTripsProvider);
+      widget.onTripStarted?.call();
+
+      _showMessage('Đã bắt đầu chuyến ${trip.title} • ${trip.routeName}',
+          isError: false);
+    } on PostgrestException catch (e) {
+      _showMessage('Bắt đầu chuyến thất bại: ${e.message}', isError: true);
+    } catch (e) {
+      _showMessage(e.toString().replaceFirst('Exception: ', ''),
+          isError: true);
+    } finally {
+      if (mounted) setState(() => _startingTripId = null);
+    }
+  }
+
+  void _showMessage(String text, {required bool isError}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(text),
+          backgroundColor:
+              isError ? Colors.red.shade600 : Colors.green.shade600,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  // =========================================================
   // ĐĂNG XUẤT
+  // =========================================================
+
   Future<void> logout() async {
     if (isLoggingOut) return;
 
@@ -71,9 +129,13 @@ class _TeacherHomePageState extends ConsumerState<TeacherHomePage> {
     }
   }
 
+  // =========================================================
   // BUILD
+  // =========================================================
+
   @override
   Widget build(BuildContext context) {
+    
     final tripsAsync = ref.watch(teacherTodayTripsProvider);
 
     return Scaffold(
@@ -108,17 +170,27 @@ class _TeacherHomePageState extends ConsumerState<TeacherHomePage> {
 
   Widget _buildTripsContent(List<TeacherTrip> trips) {
     final current = trips.where((t) => t.isInProgress).toList();
-    final upcoming = trips.where((t) => t.isScheduled).toList();
+    final scheduled = trips.where((t) => t.isScheduled).toList()
+      ..sort((a, b) => a.startAt.compareTo(b.startAt));
+
+    // Chưa có chuyến nào đang chạy -> chuyến sắp tới gần nhất hiện ở khối
+    // "hiện tại" ở dạng CHƯA BẮT ĐẦU (có nút Bắt đầu, không có tiến độ).
+    final TeacherTrip? pendingStart =
+        current.isEmpty && scheduled.isNotEmpty ? scheduled.first : null;
+    final upcoming =
+        pendingStart == null ? scheduled : scheduled.skip(1).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Chuyến xe hiện tại'),
         const SizedBox(height: 12),
-        if (current.isEmpty)
-          _buildEmptyCard('Hiện không có chuyến xe nào đang chạy.')
+        if (current.isNotEmpty)
+          ...current.map(_buildCurrentTripCard)
+        else if (pendingStart != null)
+          _buildPendingTripCard(pendingStart)
         else
-          ...current.map(_buildCurrentTripCard),
+        _buildEmptyCard('Hôm nay bạn chưa được phân công chuyến xe nào.'),
         const SizedBox(height: 24),
         _buildSectionTitle('Chuyến xe sắp tới'),
         const SizedBox(height: 12),
@@ -135,7 +207,10 @@ class _TeacherHomePageState extends ConsumerState<TeacherHomePage> {
     );
   }
 
+  // =========================================================
   // HEADER
+  // =========================================================
+
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
@@ -182,7 +257,10 @@ class _TeacherHomePageState extends ConsumerState<TeacherHomePage> {
     );
   }
 
+  // =========================================================
   // ERROR / OFFLINE BANNER
+  // =========================================================
+
   Widget _buildErrorBanner() {
     return Container(
       width: double.infinity,
@@ -238,7 +316,112 @@ class _TeacherHomePageState extends ConsumerState<TeacherHomePage> {
     );
   }
 
-  // CURRENT TRIP CARD
+  // =========================================================
+  // CHUYẾN CHƯA BẮT ĐẦU (có nút Bắt đầu, KHÔNG có tiến độ)
+  // =========================================================
+
+  Widget _buildPendingTripCard(TeacherTrip trip) {
+    final starting = _startingTripId == trip.tripId;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.directions_bus,
+                  color: TeacherHomePage.primaryColor, size: 26),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${trip.title} • ${trip.routeName}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Chưa bắt đầu',
+                  style: TextStyle(
+                    color: Colors.orange.shade800,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(Icons.directions_bus_outlined, 'Biển số xe',
+              trip.licensePlate),
+          const SizedBox(height: 10),
+          _buildInfoRow(Icons.access_time, 'Thời gian', trip.timeRange),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: starting ? null : () => _startTrip(trip),
+              icon: starting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.play_arrow_rounded, size: 24),
+              label: Text(
+                starting ? 'Đang bắt đầu...' : 'Bắt đầu chuyến',
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: TeacherHomePage.primaryColor,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor:
+                    TeacherHomePage.primaryColor.withValues(alpha: 0.5),
+                disabledForegroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Bấm "Bắt đầu chuyến" để hiển thị danh sách điểm danh.',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================
+  // CHUYẾN ĐANG CHẠY
+  // =========================================================
+
   Widget _buildCurrentTripCard(TeacherTrip trip) {
     return Container(
       width: double.infinity,
@@ -345,7 +528,10 @@ class _TeacherHomePageState extends ConsumerState<TeacherHomePage> {
     );
   }
 
+  // =========================================================
   // UPCOMING TRIP CARD
+  // =========================================================
+
   Widget _buildUpcomingTripCard(TeacherTrip trip) {
     final icon = trip.tripType == 'MORNING'
         ? Icons.directions_bus_outlined

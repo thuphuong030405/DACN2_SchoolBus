@@ -5,6 +5,8 @@ import 'register_face_page.dart';
 import 'emergency_alert_modal.dart';
 import 'trip_success_modal.dart';
 
+import 'package:mobile_app/features/trips/data/repositories/active_trip_query.dart';
+
 enum _ToastType { success, error, info }
 
 class TeacherAttendancePage extends StatefulWidget {
@@ -192,11 +194,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     setState(() => _isLoading = true);
     try {
       // Lấy chuyến xe đang chạy (IN_PROGRESS)
-      final tripRes = await _supabase
-          .from('trips')
-          .select('trip_id, status, trip_type, routes(route_name), buses(license_plate)')
-          .eq('status', 'IN_PROGRESS')
-          .maybeSingle();
+      final tripRes = await ActiveTripQuery.forCurrentTeacher(_supabase);
 
       if (tripRes == null) {
         debugPrint('Không tìm thấy chuyến xe nào đang hoạt động!');
@@ -477,6 +475,10 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isLoading && _activeTripId == null) {
+      return _buildNotStartedView();
+    }
+
     final filteredList = _attendanceList.where((item) {
       final status = item['raw_status'];
       if (_selectedFilterIndex == 1) return status == 'BOARDED' || status == 'ALIGHTED';
@@ -632,6 +634,97 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     );
   }
 
+  Widget _buildNotStartedView() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F8FF),
+      body: Column(
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(28),
+              bottomRight: Radius.circular(28),
+            ),
+            child: Container(
+              width: double.infinity,
+              height: 130,
+              color: primaryColor,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              alignment: Alignment.bottomLeft,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Điểm danh học sinh',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Khi nhà trường đã phân công chuyến cho bạn, vào tab Chuyến xe và bấm "Bắt đầu chuyến" để hiển thị danh sách điểm danh.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _fetchAttendanceData,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                children: [
+                  const SizedBox(height: 90),
+                  Center(
+                    child: Container(
+                      width: 84,
+                      height: 84,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFDBEAFE),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.directions_bus_rounded,
+                        size: 42,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Chuyến xe chưa bắt đầu',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Vào tab Chuyến xe và bấm "Bắt đầu chuyến" để hiển thị danh sách điểm danh.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildHeaderWithBubbles() {
     return ClipRRect(
       borderRadius: const BorderRadius.only(
