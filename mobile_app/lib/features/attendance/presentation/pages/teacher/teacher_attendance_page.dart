@@ -5,6 +5,7 @@ import 'emergency_alert_modal.dart';
 import 'trip_success_modal.dart';
 
 import 'package:mobile_app/features/trips/data/repositories/active_trip_query.dart';
+import 'package:mobile_app/core/offline/offline_store.dart';
 
 enum _ToastType { success, error, info }
 
@@ -36,6 +37,8 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   String _routeName = 'Tuyến 05';
   String _licensePlate = '43B-123.45';
   String _tripType = 'Đón sáng';
+  String _tripStartTime = '--:--';
+  String _tripDistance = '-- km';
 
   // Mode điểm danh: 'PICKUP' (Lên xe tại nhà) | 'DROPOFF' (Xuống xe tại trường)
   String _directionMode = 'PICKUP';
@@ -211,15 +214,32 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       final routeObj = tripRes['routes'] as Map<String, dynamic>?;
       final busObj = tripRes['buses'] as Map<String, dynamic>?;
 
-      _activeTripId = tripId;
+     _activeTripId = tripId;
       _routeName = routeObj?['route_name'] ?? 'Tuyến 05';
       _licensePlate = busObj?['license_plate'] ?? '43B-123.45';
       _tripType = tripRes['trip_type'] == 'MORNING' ? 'Đón sáng' : 'Trả chiều';
 
+      // Lấy giờ bắt đầu thực tế (hoặc giờ dự kiến nếu chưa lưu actual)
+      // Lấy giờ bắt đầu từ cột start_at của bảng trips
+      final rawStart = tripRes['start_at'];
+      if (rawStart != null) {
+        final dt = DateTime.parse(rawStart.toString()).toLocal();
+        _tripStartTime = '${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+      }
+
+      // Nếu bảng routes có cột distance_km thì lấy, không thì để '-- km'
+      final rawDist = routeObj?['distance_km'];
+      if (rawDist != null) {
+        _tripDistance = '${rawDist.toString().replaceAll('.', ',')} km';
+      }
+
       // Truy vấn danh sách điểm danh học sinh
-      final response = await _supabase
-          .from('attendance')
-          .select('''
+      final response = await OfflineStore.roster(
+        tripId: tripId,
+        name: 'list',
+        fetch: () async => await _supabase
+            .from('attendance')
+            .select('''
             attendance_id,
             status,
             detection_method,
@@ -233,7 +253,8 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               class_name
             )
           ''')
-          .eq('trip_id', tripId);
+            .eq('trip_id', tripId),
+      );
 
       final List loadedData = [];
 
@@ -315,26 +336,21 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     final now = DateTime.now().toUtc().toIso8601String();
 
     try {
-      final updated = await _supabase
-          .from('attendance')
-          .update({
-            'status': pickup ? 'BOARDED' : 'ALIGHTED',
-            'detection_method': 'MANUAL',
-            'ai_confidence': null, // bắt buộc null khi điểm danh tay
-            if (pickup) 'check_in_time': now else 'check_out_time': now,
-            'recorded_by': _supabase.auth.currentUser?.id,
-          })
-          .eq('attendance_id', attendanceId)
-          .select('attendance_id');
-
-      if (updated.isEmpty) {
-        _showToast(
-          type: _ToastType.error,
-          title: 'Không cập nhật được',
-          subtitle: 'Bạn không có quyền sửa dòng này hoặc trạng thái đã thay đổi',
-        );
-        return;
-      }
+      final values = <String, dynamic>{
+        'status': pickup ? 'BOARDED' : 'ALIGHTED',
+        'detection_method': 'MANUAL',
+        'ai_confidence': null, // bắt buộc null khi điểm danh tay
+        if (pickup) 'check_in_time': now else 'check_out_time': now,
+        'recorded_by': _supabase.auth.currentUser?.id,
+      };
+      await OfflineStore.patchWhere('roster_', 'attendance_id', attendanceId, values);
+      await SyncService.enqueueUpdate(
+        table: 'attendance',
+        values: values,
+        matchColumn: 'attendance_id',
+        matchValue: '$attendanceId',
+      );
+      SyncService.flush();
 
       await _fetchAttendanceData();
 
@@ -408,10 +424,30 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     final nowTime = DateTime.now();
     final formattedEndTime = "${nowTime.hour}:${nowTime.minute.toString().padLeft(2, '0')}";
 
-    await _supabase
-        .from('trips')
-        .update({'status': 'COMPLETED'})
-        .eq('trip_id', _activeTripId!);
+    final skippedText = absentCount == 0
+        ? '0 điểm · đi đủ lộ trình'
+        : '$absentCount điểm (bé nghỉ phép)';
+
+    try {
+      // 1. Cập nhật trực tiếp lên Supabase trước để đảm bảo DB đổi sang COMPLETED ngay
+      await _supabase
+          .from('trips')
+          .update({'status': 'COMPLETED'})
+          .eq('trip_id', _activeTripId!);
+    } catch (_) {
+      // Nếu mất mạng thì mới đẩy vào hàng đợi offline
+      await SyncService.enqueueUpdate(
+        table: 'trips',
+        values: {'status': 'COMPLETED'},
+        matchColumn: 'trip_id',
+        matchValue: _activeTripId!,
+      );
+      await SyncService.flush();
+    }
+
+    // 2. Xóa sạch cache chuyến đang chạy ở máy
+    await OfflineStore.patchWhere('today_trips_', 'trip_id', _activeTripId, {'status': 'COMPLETED'});
+    await OfflineStore.removePrefix('active_trip_');
 
     if (mounted) {
       showGeneralDialog(
@@ -421,10 +457,17 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           return TripSuccessModal(
             alightedCount: alightedCount,
             absentCount: absentCount,
+            startTime: _tripStartTime,
             endTime: formattedEndTime,
-            onGoHome: () {
-              Navigator.pop(context); // Đóng màn hình thành công
-              _fetchAttendanceData(); // Làm mới dữ liệu
+            distance: _tripDistance,
+            skippedStopsInfo: skippedText,
+            onGoHome: () async {
+              Navigator.pop(context); // Đóng modal
+              setState(() {
+                _activeTripId = null; // Reset trạng thái chuyến về null ngay lập tức
+                _attendanceList = [];
+              });
+              await _fetchAttendanceData(); // Tải lại từ DB để xác nhận
             },
           );
         },

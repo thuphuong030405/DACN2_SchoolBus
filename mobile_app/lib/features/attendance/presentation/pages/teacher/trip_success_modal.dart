@@ -13,13 +13,13 @@ class TripSuccessModal extends StatelessWidget {
     super.key,
     required this.alightedCount,
     required this.absentCount,
-    this.startTime = '6:15',
-    this.endTime = '7:12',
-    this.distance = '18,4 km',
-    this.skippedStopsInfo = '1 điểm · tiết kiệm 4 phút',
+    required this.startTime,
+    required this.endTime,
+    required this.distance,
+    required this.skippedStopsInfo,
     required this.onGoHome,
   });
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -7,6 +7,7 @@ import '../../domain/entities/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_datasource.dart';
 import '../models/app_user_model.dart';
+import 'package:mobile_app/core/offline/offline_store.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
@@ -69,8 +70,25 @@ class AuthRepositoryImpl implements AuthRepository {
           'Tài khoản đã bị khóa. Vui lòng liên hệ nhà trường.',
         );
       }
+      await OfflineStore.put('profile_${profile['user_id']}', profile); // lưu lại
       return AppUserModel.fromMap(profile);
-    } catch (_) {
+    } catch (e) {
+      final isServerRejection = e is AuthFailure ||
+          e is PostgrestException ||
+          (e is AuthException && e is! AuthRetryableFetchException);
+
+      if (!isServerRejection) {
+        // Lỗi mạng: KHÔNG đăng xuất, dùng hồ sơ đã lưu
+        final uid = remoteDataSource.client.auth.currentUser?.id;
+        if (uid != null) {
+          final cached = await OfflineStore.get('profile_$uid');
+          if (cached is Map) {
+            return AppUserModel.fromMap(Map<String, dynamic>.from(cached));
+          }
+        }
+        rethrow;
+      }
+
       try {
         await remoteDataSource.logout();
       } catch (_) {}

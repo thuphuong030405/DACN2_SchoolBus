@@ -10,6 +10,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../students/data/services/face_embedding_helper.dart';
 import '../../../../students/data/services/mobile_facenet_service.dart'; // 🟢 Import Service AI MobileFaceNet
 
+import 'package:mobile_app/core/offline/offline_store.dart';
+
 enum _NoticeType { success, warning, error, info }
 
 class _ScanNotice {
@@ -133,6 +135,9 @@ class _FaceScanPageState extends State<FaceScanPage>
   }
   Future<void> _initCamera() async {
     try {
+      OfflineStore.roster(tripId: widget.tripId, name: 'face', fetch: _fetchFaceRoster)
+      .catchError((_) => <Map<String, dynamic>>[]);
+
       _cameras = await availableCameras();
       if (_cameras != null && _cameras!.isNotEmpty) {
         final camera = _cameras!.firstWhere(
@@ -217,6 +222,25 @@ class _FaceScanPageState extends State<FaceScanPage>
     });
   }
 
+  Future<dynamic> _fetchFaceRoster() async {
+    return await _supabase.from('attendance').select('''
+      attendance_id,
+      status,
+      students!inner (
+        student_id,
+        student_code,
+        full_name,
+        class_name,
+        avatar_url,
+        face_embeddings (
+          embedding_data,
+          is_active,
+          model_name
+        )
+      )
+    ''').eq('trip_id', widget.tripId);
+  }
+
   Future<void> _processMobileFaceNetMatching(String imagePath, Face face) async {
     try {
       // 🟢 1. Trích xuất Vector Embedding 192 chiều từ mô hình AI MobileFaceNet
@@ -231,27 +255,12 @@ class _FaceScanPageState extends State<FaceScanPage>
       }
 
       // 2. Truy vấn tất cả học sinh trong chuyến xe
-      final allStudentsInTrip = await _supabase
-          .from('attendance')
-          .select('''
-            attendance_id,
-            status,
-            students!inner (
-              student_id,
-              student_code,
-              full_name,
-              class_name,
-              avatar_url,
-              face_embeddings (
-                embedding_data,
-                is_active,
-                model_name
-              )
-            )
-          ''')
-          .eq('trip_id', widget.tripId);
-
-      final List listData = allStudentsInTrip as List;
+      final List listData = await OfflineStore.roster(
+        tripId: widget.tripId,
+        name: 'face',
+        preferCache: true,          // có bản trong máy thì dùng luôn, quét nhanh
+        fetch: _fetchFaceRoster,
+      );
 
       if (!mounted || _scannedStudent != null) return;
       
@@ -504,61 +513,73 @@ class _FaceScanPageState extends State<FaceScanPage>
   }
 
   Future<void> _fetchTripStats() async {
-    try {
-      final res = await _supabase
-          .from('attendance')
-          .select('status')
-          .eq('trip_id', widget.tripId);
+  try {
+    final res = await OfflineStore.roster(
+      tripId: widget.tripId,
+      name: 'face',
+      preferCache: true,
+      fetch: _fetchFaceRoster,
+    );
 
-      final total = res.length;
-      final boarded = res.where((e) => e['status'] == 'BOARDED').length;
-      final alighted = res.where((e) => e['status'] == 'ALIGHTED').length;
+    final total = res.length;
+    final boarded = res.where((e) => e['status'] == 'BOARDED').length;
+    final alighted = res.where((e) => e['status'] == 'ALIGHTED').length;
 
-      if (mounted) {
-        setState(() {
-          _totalCount = total;
-          _boardedCount = _isDropoff ? alighted : boarded + alighted;
-        });
-      }
-    } catch (e) {
-      debugPrint('Lỗi tải thống kê: $e');
-    }
-  }
-
-  Future<void> _confirmAndScanNext() async {
-    if (_scannedStudent == null) return;
-
-    try {
-      final String attendanceId = _scannedStudent!['attendance_id'];
-      final String checkInTimeRaw = _scannedStudent!['check_in_time_raw'];
-      final double confidenceScore = _scannedStudent!['similarity_score'] ?? 0.95;
-
-      final bool dropoff = _scannedStudent!['mode'] == 'DROPOFF';
-      final double conf = double.parse(
-        confidenceScore.clamp(0.0, 1.0).toStringAsFixed(4),
-      );
-
-      await _supabase.from('attendance').update({
-        'status': dropoff ? 'ALIGHTED' : 'BOARDED',
-        'detection_method': 'AI',
-        'ai_confidence': conf,
-        if (dropoff) 'check_out_time': checkInTimeRaw else 'check_in_time': checkInTimeRaw,
-        'recorded_by': _supabase.auth.currentUser?.id,
-      }).eq('attendance_id', attendanceId);
-
-      await _fetchTripStats();
-
+    if (mounted) {
       setState(() {
-        _scannedStudent = null;
-        _isScanning = true;
-        _isProcessingAI = false;
+        _totalCount = total;
+        _boardedCount = _isDropoff ? alighted : boarded + alighted;
       });
-
-      _startLiveFaceDetection();
-    } catch (e) {
-      debugPrint('Lỗi ghi nhận điểm danh: $e');
     }
+  } catch (e) {
+    debugPrint('Lỗi tải thống kê: $e');
   }
+}
+
+Future<void> _confirmAndScanNext() async {
+  if (_scannedStudent == null) return;
+
+  try {
+    final String attendanceId = _scannedStudent!['attendance_id'];
+    final String checkInTimeRaw = _scannedStudent!['check_in_time']; // đã sửa key
+    final double confidenceScore = _scannedStudent!['similarity_score'] ?? 0.95;
+
+    final bool dropoff = _scannedStudent!['mode'] == 'DROPOFF';
+    final double conf = double.parse(
+      confidenceScore.clamp(0.0, 1.0).toStringAsFixed(4),
+    );
+
+    final values = <String, dynamic>{
+      'status': dropoff ? 'ALIGHTED' : 'BOARDED',
+      'detection_method': 'AI',
+      'ai_confidence': conf,
+      if (dropoff) 'check_out_time': checkInTimeRaw else 'check_in_time': checkInTimeRaw,
+      'recorded_by': _supabase.auth.currentUser?.id,
+    };
+
+    // 1) Sửa ngay trong máy  2) Xếp hàng đợi  3) Có mạng thì đẩy luôn
+    await OfflineStore.patchWhere('roster_', 'attendance_id', attendanceId, values);
+    await SyncService.enqueueUpdate(
+      table: 'attendance',
+      values: values,
+      matchColumn: 'attendance_id',
+      matchValue: attendanceId,
+    );
+    SyncService.flush(); // không await
+
+    await _fetchTripStats();
+
+    setState(() {
+      _scannedStudent = null;
+      _isScanning = true;
+      _isProcessingAI = false;
+    });
+
+    _startLiveFaceDetection();
+  } catch (e) {
+    debugPrint('Lỗi ghi nhận điểm danh: $e');
+  }
+}
 
   Future<void> _stopLiveFaceDetection() async {
     if (_cameraController != null && 
