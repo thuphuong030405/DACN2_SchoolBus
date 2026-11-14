@@ -1,7 +1,23 @@
 import { supabase } from '@/lib/supabase'
-import type { FaceStatus, StudentRow } from '../types'
+import type { ChildRequest, FaceStatus, StudentRow } from '../types'
 
 const REQUIRED_ANGLES = 3 // nhìn thẳng, quay trái, quay phải
+
+interface LinkRow {
+  student_id: string
+  parent_id: string
+  relationship: string
+  verification_status: string
+  parent_name: string | null
+  parent_phone: string | null
+  parent_email: string | null
+  student_code: string | null
+  student_name: string | null
+  date_of_birth: string | null
+  gender: string | null
+  class_name: string | null
+  student_status: string | null
+}
 
 const first = <T,>(x: T | T[] | null | undefined): T | undefined =>
   Array.isArray(x) ? x[0] : (x ?? undefined)
@@ -14,44 +30,41 @@ function maskPhone(p?: string | null): string {
 
 function faceStatusOf(valid: number, total: number): FaceStatus {
   if (valid >= REQUIRED_ANGLES) return 'REGISTERED'
-  if (total > 0) return 'NEEDS_UPDATE' // thiếu góc, sai mô hình hoặc bị vô hiệu
+  if (total > 0) return 'NEEDS_UPDATE'
   return 'NONE'
 }
 
+async function fetchLinks(): Promise<LinkRow[]> {
+  const { data, error } = await supabase.rpc('admin_parent_links')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as LinkRow[]
+}
+
 export const studentService = {
-  /** Trường có vài trăm học sinh nên lấy hết, lọc và phân trang ở trình duyệt. */
+  /** Danh sách học sinh đang hoạt động. Phụ huynh chỉ tính khi đã được duyệt (APPROVED). */
   async getStudents(): Promise<StudentRow[]> {
-    const [studentsRes, routeLinksRes, routesRes, parentLinksRes, usersRes, faceRes] =
-      await Promise.all([
-        supabase
-          .from('students')
-          .select('student_id, student_code, full_name, class_name, avatar_url')
-          .order('full_name'),
+    const [studentsRes, routeLinksRes, routesRes, links, faceRes] = await Promise.all([
+      supabase
+        .from('students')
+        .select('student_id, student_code, full_name, class_name, avatar_url')
+        .eq('status', 'ACTIVE') // ẩn em chưa duyệt / đã ngừng
+        .order('full_name'),
 
-        // Tuyến + điểm đón (cùng khóa ngoại với trang Điểm danh)
-        supabase
-          .from('student_routes')
-          .select(`
-            student_id,
-            route_id,
-            pickup_stop:route_stops!student_routes_route_id_pickup_stop_id_fkey ( stop_name )
-          `)
-          .eq('status', 'ACTIVE'),
+      supabase
+        .from('student_routes')
+        .select(`
+          student_id,
+          route_id,
+          pickup_stop:route_stops!student_routes_route_id_pickup_stop_id_fkey ( stop_name )
+        `)
+        .eq('status', 'ACTIVE'),
 
-        supabase.from('routes').select('route_id, route_code'),
+      supabase.from('routes').select('route_id, route_code'),
+      fetchLinks(),
+      supabase.rpc('admin_face_summary'),
+    ])
 
-        supabase.from('student_parents').select('student_id, parents ( user_id )'),
-
-        // Nếu giá trị role của phụ huynh không phải 'PARENT', sửa ở đây
-        supabase
-          .from('users')
-          .select('user_id, full_name, phone')
-          .eq('role', 'PARENT'),
-
-        supabase.rpc('admin_face_summary'),
-      ])
-
-    for (const res of [studentsRes, routeLinksRes, routesRes, parentLinksRes, usersRes, faceRes]) {
+    for (const res of [studentsRes, routeLinksRes, routesRes, faceRes]) {
       if (res.error) throw new Error(res.error.message)
     }
 
@@ -69,16 +82,13 @@ export const studentService = {
       })
     }
 
-    const userById = new Map(
-      (usersRes.data ?? []).map((u) => [u.user_id as string, u]),
-    )
-
     const parentByStudent = new Map<string, { name: string; phone: string }>()
-    for (const l of parentLinksRes.data ?? []) {
-      if (parentByStudent.has(l.student_id)) continue
-      const p = first(l.parents as { user_id: string } | { user_id: string }[] | null)
-      const u = p ? userById.get(p.user_id) : undefined
-      if (u) parentByStudent.set(l.student_id, { name: u.full_name, phone: u.phone })
+    for (const l of links) {
+      if (l.verification_status !== 'APPROVED' || parentByStudent.has(l.student_id)) continue
+      parentByStudent.set(l.student_id, {
+        name: l.parent_name ?? '—',
+        phone: l.parent_phone ?? '',
+      })
     }
 
     const faceByStudent = new Map(
@@ -88,7 +98,6 @@ export const studentService = {
 
     return (studentsRes.data ?? []).map((s): StudentRow => {
       const face = faceByStudent.get(s.student_id)
-      const valid = face?.valid_count ?? 0
       const route = routeByStudent.get(s.student_id)
       const parent = parentByStudent.get(s.student_id)
       return {
@@ -99,11 +108,49 @@ export const studentService = {
         avatarUrl: s.avatar_url ?? null,
         parentName: parent?.name ?? '—',
         parentPhone: maskPhone(parent?.phone),
+        hasParent: !!parent,
         routeCode: route?.code ?? '—',
         pickupStop: route?.stop ?? '—',
-        faceStatus: faceStatusOf(valid, face?.total_count ?? 0),
-        faceCount: valid,
+        faceStatus: faceStatusOf(face?.valid_count ?? 0, face?.total_count ?? 0),
+        faceCount: face?.valid_count ?? 0,
       }
     })
+  },
+
+  /** Các đăng ký đang chờ nhà trường duyệt. */
+  async getChildRequests(): Promise<ChildRequest[]> {
+    const links = await fetchLinks()
+    return links
+      .filter((l) => l.verification_status === 'PENDING')
+      .map((l): ChildRequest => ({
+        studentId: l.student_id,
+        parentId: l.parent_id,
+        studentCode: l.student_code ?? '',
+        fullName: l.student_name ?? '',
+        dateOfBirth: l.date_of_birth,
+        gender: l.gender,
+        className: l.class_name ?? '',
+        relationship: l.relationship,
+        parentName: l.parent_name ?? '—',
+        parentPhone: l.parent_phone ?? '',
+        parentEmail: l.parent_email ?? '',
+      }))
+  },
+
+  async reviewRequest(p: {
+    studentId: string
+    parentId: string
+    approve: boolean
+    mergeIntoId?: string
+    note?: string
+  }) {
+    const { error } = await supabase.rpc('admin_review_child_link', {
+      p_student_id: p.studentId,
+      p_parent_id: p.parentId,
+      p_approve: p.approve,
+      p_merge_into: p.mergeIntoId ?? null,
+      p_note: p.note ?? null,
+    })
+    if (error) throw new Error(error.message)
   },
 }

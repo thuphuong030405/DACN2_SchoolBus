@@ -7,21 +7,25 @@ class ParentRepositoryImpl implements ParentRepository {
   ParentRepositoryImpl(this._db);
   final SupabaseClient _db;
 
-  @override
+    @override
   Future<List<ChildInfo>> getMyChildren() async {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) throw AuthException('Chưa đăng nhập');
 
-    final rows = await _db
-        .from('student_parents')
-        .select('student_id, relationship, verification_status, can_receive_notifications, '
-            'students(student_id, student_code, full_name, class_name, avatar_url), '
-            'parents!inner(user_id)')
-        .eq('parents.user_id', uid);
-
-    return (rows as List)
-        .map((e) => ChildInfo.fromMap(e as Map<String, dynamic>))
-        .toList();
+    final rows = await _db.rpc('get_my_children');
+    return (rows as List).map((e) {
+      final m = e as Map<String, dynamic>;
+      return ChildInfo(
+        studentId: m['student_id'] as String,
+        studentCode: m['student_code'] as String?,
+        fullName: (m['full_name'] as String?) ?? '',
+        className: m['class_name'] as String?,
+        avatarUrl: m['avatar_url'] as String?,
+        relationship: m['relationship'] as String,
+        verificationStatus: m['verification_status'] as String,
+        notificationsEnabled: (m['can_receive_notifications'] as bool?) ?? true,
+      );
+    }).toList();
   }
 
   @override
@@ -35,6 +39,25 @@ class ParentRepositoryImpl implements ParentRepository {
     });
   }
 
+    @override
+  Future<void> registerChild({
+    required String fullName,
+    required DateTime dateOfBirth,
+    String? gender,
+    String? className,
+    required String relationship,
+  }) async {
+    String two(int n) => n.toString().padLeft(2, '0');
+    await _db.rpc('submit_child_registration', params: {
+      'p_full_name': fullName.trim(),
+      'p_date_of_birth':
+          '${dateOfBirth.year.toString().padLeft(4, '0')}-${two(dateOfBirth.month)}-${two(dateOfBirth.day)}',
+      'p_gender': gender,
+      'p_class_name':
+          (className == null || className.trim().isEmpty) ? null : className.trim(),
+      'p_relationship': relationship,
+    });
+  }
   Future<List<TodayTrip>> _fetchToday(String studentId) async {
     final rows =
         await _db.rpc('get_child_today', params: {'p_student_id': studentId});

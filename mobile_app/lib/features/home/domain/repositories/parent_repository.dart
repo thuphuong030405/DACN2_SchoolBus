@@ -7,6 +7,14 @@ abstract class ParentRepository {
     required String studentCode,
     required String relationship,
   });
+    /// Phụ huynh tự đăng ký con, nhà trường sẽ duyệt.
+  Future<void> registerChild({
+    required String fullName,
+    required DateTime dateOfBirth,
+    String? gender,
+    String? className,
+    required String relationship,
+  });
   Stream<List<TodayTrip>> watchChildToday(String studentId);
   Stream<GpsPoint?> watchBusLocation(String tripId);
 

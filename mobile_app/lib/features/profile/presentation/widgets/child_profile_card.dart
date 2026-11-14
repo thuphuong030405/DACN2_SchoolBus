@@ -233,7 +233,7 @@ class _NotApproved extends ConsumerWidget {
       builder: (_) => AlertDialog(
         title: Text(rejected ? 'Xóa yêu cầu?' : 'Hủy yêu cầu liên kết?'),
         content: Text(rejected
-            ? 'Yêu cầu bị từ chối sẽ được xóa. Bạn có thể gửi lại bằng mã học sinh.'
+            ? 'Yêu cầu bị từ chối sẽ được xóa. Bạn có thể đăng ký lại.'
             : 'Yêu cầu đang chờ nhà trường duyệt sẽ bị hủy.'),
         actions: [
           TextButton(
@@ -282,7 +282,9 @@ class _NotApproved extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      rejected ? 'Yêu cầu liên kết bị từ chối' : 'Đang chờ nhà trường duyệt',
+                        rejected
+                        ? 'Đăng ký của ${child.fullName} bị từ chối'
+                        : '${child.fullName} · đang chờ nhà trường duyệt',
                       style: const TextStyle(
                           color: _ink,
                           fontSize: 15,
@@ -292,7 +294,7 @@ class _NotApproved extends ConsumerWidget {
                     const SizedBox(height: 2),
                     Text(
                       rejected
-                          ? 'Bạn có thể xóa yêu cầu rồi gửi lại bằng mã học sinh.'
+                          ? 'Bạn có thể xóa yêu cầu rồi đăng ký lại.'
                           : 'Yêu cầu liên kết với tư cách: $rel',
                       style: const TextStyle(
                           color: _muted, fontSize: 12, fontFamily: 'Be Vietnam Pro'),

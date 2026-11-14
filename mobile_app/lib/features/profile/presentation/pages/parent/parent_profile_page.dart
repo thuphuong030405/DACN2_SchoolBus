@@ -7,7 +7,7 @@ import 'package:mobile_app/features/profile/presentation/pages/parent/change_pas
 import 'package:mobile_app/features/profile/presentation/pages/parent/edit_profile_page.dart';
 import 'package:mobile_app/features/profile/presentation/pages/parent/help_contact_page.dart';
 import 'package:mobile_app/features/profile/presentation/widgets/child_profile_card.dart';
-import 'package:mobile_app/features/students/presentation/pages/parent/link_child_page.dart';
+import 'package:mobile_app/features/students/presentation/pages/parent/register_child_page.dart';
 
 const _bg = Color(0xFFEEF5FF);
 const _primary = Color(0xFF102A63);
@@ -411,7 +411,7 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
                         ),
                       ),
                       TextButton.icon(
-                        onPressed: () => _push(const LinkChildPage()),
+                        onPressed: () => _push(const RegisterChildPage()),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           minimumSize: Size.zero,
@@ -420,7 +420,7 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
                         icon: const Icon(Icons.person_add_alt_1_rounded,
                             size: 17, color: _primaryMid),
                         label: const Text(
-                          'Liên kết thêm con',
+                          'Đăng ký thêm con',
                           style: TextStyle(
                             color: _primaryMid,
                             fontSize: 13,
@@ -493,7 +493,7 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
                             subtitle: Text(
                               hasChildren
                                   ? 'Lên/xuống xe, xe sắp tới. Cảnh báo khẩn luôn được gửi.'
-                                  : 'Liên kết với con để bật thông báo',
+                                  : 'Đăng ký con để bật thông báo',
                               style: _tileSub,
                             ),
                             value: pushValue,

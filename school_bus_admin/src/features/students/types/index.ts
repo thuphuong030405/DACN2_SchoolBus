@@ -8,8 +8,23 @@ export interface StudentRow {
   avatarUrl: string | null
   parentName: string
   parentPhone: string // đã che bớt, ví dụ 09•• ••• 678
+  hasParent: boolean // có phụ huynh đã được duyệt
   routeCode: string
   pickupStop: string
   faceStatus: FaceStatus
-  faceCount: number // số vector hợp lệ (đủ 3 góc là đạt)
+  faceCount: number
+}
+
+export interface ChildRequest {
+  studentId: string
+  parentId: string
+  studentCode: string
+  fullName: string
+  dateOfBirth: string | null // YYYY-MM-DD
+  gender: string | null
+  className: string
+  relationship: string
+  parentName: string
+  parentPhone: string
+  parentEmail: string
 }

@@ -165,8 +165,14 @@ export function StudentsTable({ rows, isLoading, selectedId, onSelect }: Props) 
                     </div>
                   </td>
                   <td className="py-3 leading-tight">
-                    <div className="text-slate-700">{s.parentName}</div>
-                    <div className="text-xs text-slate-400">{s.parentPhone}</div>
+                    {s.hasParent ? (
+                      <>
+                        <div className="text-slate-700">{s.parentName}</div>
+                        <div className="text-xs text-slate-400">{s.parentPhone}</div>
+                      </>
+                    ) : (
+                      <span className="text-xs font-semibold text-rose-500">Chưa có phụ huynh</span>
+                    )}
                   </td>
                   <td className="py-3 text-slate-700">{s.routeCode}</td>
                   <td className="py-3 text-slate-700">{s.pickupStop}</td>

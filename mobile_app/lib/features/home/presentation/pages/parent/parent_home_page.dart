@@ -12,8 +12,7 @@ import 'package:mobile_app/features/home/presentation/widgets/parents/home_widge
 import 'package:mobile_app/features/home/presentation/widgets/parents/trip_details_card.dart';
 import 'package:mobile_app/features/home/presentation/widgets/parents/trip_timeline.dart';
 import 'package:mobile_app/features/home/presentation/providers/parent_providers.dart';
-import 'package:mobile_app/features/students/presentation/pages/parent/link_child_page.dart';
-
+import 'package:mobile_app/features/students/presentation/pages/parent/register_child_page.dart';
 // =============================================================================
 // Trang chủ phụ huynh. File này chỉ ghép màn hình; logic ở trip_view_logic.dart,
 // các thành phần giao diện ở thư mục widgets/.
@@ -103,9 +102,9 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              pendingCount > 0
-                  ? 'Yêu cầu liên kết đang chờ nhà trường duyệt'
-                  : 'Bạn chưa liên kết với học sinh nào',
+                pendingCount > 0
+                ? 'Đăng ký con đang chờ nhà trường duyệt'
+                : 'Bạn chưa đăng ký học sinh nào',
               textAlign: TextAlign.center,
               style: homeText(16, FontWeight.w600, HomeColors.ink),
             ),
@@ -117,10 +116,10 @@ class _EmptyState extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('Liên kết con'),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LinkChildPage()),
-              ),
+                label: const Text('Đăng ký con'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RegisterChildPage()),
+                ),
             ),
           ],
         ),
