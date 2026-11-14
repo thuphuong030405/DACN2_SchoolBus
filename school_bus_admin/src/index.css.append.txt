@@ -1,0 +1,14 @@
+/* Thêm vào CUỐI src/index.css sau khi chạy `npx shadcn@latest init`.
+   Màu theo thiết kế Figma của nhóm (xanh dương, vàng xe buýt, xanh đen). */
+@theme {
+  --color-ink: #10224a;
+  --color-brand: #2563eb;
+  --color-brand-dark: #1d4ed8;
+  --color-sun: #ffc93c;
+  --color-page: #eef5ff;
+  --color-muted-ink: #52628a;
+  --font-sans: "Be Vietnam Pro", system-ui, sans-serif;
+}
+
+/* Trong khối :root do shadcn tạo, đổi màu chính thành xanh của nhóm: */
+/*   --primary: #2563eb;  --primary-foreground: #ffffff;               */

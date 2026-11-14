@@ -1,0 +1,93 @@
+.leave-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.leave-stat-card {
+  min-width: 0;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+}
+
+.leave-stat-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.leave-stat-label {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.leave-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.leave-stat-value {
+  margin-top: 14px;
+  color: #172033;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.leave-stat-description {
+  margin-top: 7px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.leave-stat-orange .leave-stat-icon {
+  color: #d97706;
+  background: #fff7ed;
+}
+
+.leave-stat-green .leave-stat-icon {
+  color: #059669;
+  background: #ecfdf5;
+}
+
+.leave-stat-red .leave-stat-icon {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.leave-stat-blue .leave-stat-icon {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+@media (max-width: 900px) {
+  .leave-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .leave-stats {
+    gap: 10px;
+  }
+
+  .leave-stat-card {
+    padding: 14px;
+  }
+
+  .leave-stat-value {
+    font-size: 25px;
+  }
+}

@@ -1,0 +1,266 @@
+.add-bus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.add-bus-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+  animation: addBusAppear 0.2s ease-out;
+}
+
+@keyframes addBusAppear {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.add-bus-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 24px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.add-bus-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.add-bus-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #3568e8;
+  background: #edf3ff;
+  border-radius: 12px;
+}
+
+.add-bus-heading h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.add-bus-heading p {
+  margin: 5px 0 0;
+  color: #8992a3;
+  font-size: 13px;
+}
+
+.add-bus-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7b8495;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.add-bus-close:hover {
+  color: #263247;
+  background: #f2f4f8;
+}
+
+.add-bus-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.add-bus-body {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  padding: 24px;
+}
+
+.add-bus-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.add-bus-form-group label {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.add-bus-form-group label span {
+  color: #e5484d;
+}
+
+.add-bus-form-group input,
+.add-bus-form-group select {
+  width: 100%;
+  height: 43px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  color: #253047;
+  background: #ffffff;
+  border: 1px solid #dce1e9;
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+  font-size: 13px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.add-bus-form-group input::placeholder {
+  color: #a4adbb;
+}
+
+.add-bus-form-group input:focus,
+.add-bus-form-group select:focus {
+  border-color: #4778ed;
+  box-shadow: 0 0 0 3px rgba(71, 120, 237, 0.12);
+}
+
+.add-bus-form-group input:disabled,
+.add-bus-form-group select:disabled {
+  background: #f5f6f8;
+  cursor: not-allowed;
+}
+
+.add-bus-form-row {
+  display: flex;
+  gap: 14px;
+}
+
+.add-bus-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px;
+  color: #64748b;
+  background: #f5f8ff;
+  border: 1px solid #e5edff;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.add-bus-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #4778ed;
+}
+
+.add-bus-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 12px;
+  color: #c0393b;
+  background: #fff2f1;
+  border: 1px solid #ffd9d6;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.add-bus-error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.add-bus-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 17px 24px;
+  border-top: 1px solid #edf0f5;
+}
+
+.add-bus-cancel,
+.add-bus-submit {
+  height: 40px;
+  padding: 0 17px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.add-bus-cancel {
+  color: #526078;
+  background: #ffffff;
+  border: 1px solid #dce1e9;
+}
+
+.add-bus-cancel:hover {
+  background: #f5f6f8;
+}
+
+.add-bus-submit {
+  color: #ffffff;
+  background: #3568e8;
+  border: 1px solid #3568e8;
+}
+
+.add-bus-submit:hover {
+  background: #2856cc;
+  border-color: #2856cc;
+}
+
+.add-bus-cancel:disabled,
+.add-bus-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .add-bus-overlay {
+    padding: 12px;
+  }
+
+  .add-bus-header,
+  .add-bus-body {
+    padding: 18px;
+  }
+
+  .add-bus-footer {
+    padding: 14px 18px;
+  }
+
+  .add-bus-form-row {
+    flex-direction: column;
+  }
+
+  .add-bus-heading h2 {
+    font-size: 16px;
+  }
+}
